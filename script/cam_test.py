@@ -7,7 +7,9 @@ from config import cfg, update_config_from_file
 from torch.utils.data import DataLoader
 from dataset.collate import collate_test
 from model.clf_net import Cls_Net
+from model.gap_cls_net import GAP_Net
 from model.gradCAM import gradCAM
+from model.CAM import CAM
 import matplotlib as mpl
 mpl.use("Agg")
 import matplotlib.pyplot as plt
@@ -25,9 +27,11 @@ def cam_test(dataset, net, load_dir, session, epoch, log, add_params):
     log.info(Back.WHITE + Fore.BLACK + 'Loading model from %s' % (model_path))
     checkpoint = torch.load(model_path, map_location=device)
     cam_model = Cls_Net(dataset.num_classes-1)
+    #cam_model = GAP_Net(dataset.num_classes-1)
     cam_model.to(device)
     cam_model.load_state_dict(checkpoint['model'])
-    grad_cam = gradCAM(cam_model)
+    cam = gradCAM(cam_model)
+    #cam = CAM(cam_model)
 
     save_root_dir = os.path.join(cfg.DATA_DIR, 'debug', 'session_' + str(session))
     save_dir = os.path.join(save_root_dir, 'gt_heatmap')
@@ -50,7 +54,7 @@ def cam_test(dataset, net, load_dir, session, epoch, log, add_params):
             image = cv.imread(dataset.image_path_at(image_ids[0]))
             image = cv.resize(image, (width, height), interpolation=cv.INTER_LINEAR)
             for i, label in enumerate(image_labels[0]):
-                saliency, logits = grad_cam(image_data, label)
+                saliency, logits = cam(image_data, label)
                 max_act = np.max(saliency)
                 binary_mask = (saliency>=0.2*max_act)
                 binary_mask = np.uint8(255 * binary_mask)
@@ -63,6 +67,10 @@ def cam_test(dataset, net, load_dir, session, epoch, log, add_params):
                 ax[1].axis('off')
                 image_rgb = cv.cvtColor(image.astype(np.uint8), cv.COLOR_BGR2RGB)
                 cv.drawContours(image_rgb, contours, -1, (0, 255, 0), 3)
+                cntsSorted = sorted(contours, key=lambda x: cv.contourArea(x))
+                for cntr in cntsSorted:
+                    x, y, w, h = cv.boundingRect(cntr)
+                    cv.rectangle(image_rgb, (x, y), (x + w, y + h), (0,255,0), 3)
                 ax[0].imshow(image_rgb)
                 ax[1].imshow(binary_mask, cmap='jet', interpolation='nearest')
                 class_name = dataset.classes[label]

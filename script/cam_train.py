@@ -14,6 +14,7 @@ from torch.optim import SGD, Adam
 from torch.optim.lr_scheduler import MultiStepLR
 from dataset.collate import collate_train, collate_test
 from model.clf_net import Cls_Net
+from model.gap_cls_net import GAP_Net
 from utils.visdom_plot import *
 
 watch_list = ['000012', '000017', '000019', '000021', '000026', '000036', '000089', '000102', '000121', '000130', '000198']
@@ -46,7 +47,8 @@ def cam_train(dataset, net, batch_size, learning_rate, resume, total_epoch,
         os.makedirs(output_dir)
     print(Back.CYAN + Fore.BLACK + 'Output directory: %s' % (output_dir))
 
-    cam_model = Cls_Net(dataset.num_classes-1)
+    #cam_model = Cls_Net(dataset.num_classes-1)
+    cam_model = GAP_Net(dataset.num_classes-1)
     cam_model.to(device)
 
     optimizer = SGD(cam_model.parameters(), lr=cfg.TRAIN.LEARNING_RATE, momentum=cfg.TRAIN.MOMENTUM)
@@ -125,7 +127,8 @@ def cam_train(dataset, net, batch_size, learning_rate, resume, total_epoch,
             image_ids = data[4]
 
             with torch.no_grad():
-                logits, targets = cam_model(image_data, image_labels)
+                #logits, targets = cam_model(image_data, image_labels)
+                logits, targets, _ = cam_model(image_data, image_labels)
                 outputs = torch.sigmoid(logits)
                 outputs[outputs >= 0.5] = 1
                 outputs[outputs < 0.5] = 0
